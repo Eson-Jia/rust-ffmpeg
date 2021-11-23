@@ -15,6 +15,7 @@ fn main() {
     let mut octx = format::output(&output_file).unwrap();
 
     let mut stream_mapping = vec![0; ictx.nb_streams() as _];
+    let mut first_frame_mapping = vec![true; ictx.nb_streams() as _];
     let mut ist_time_bases = vec![Rational(0, 1); ictx.nb_streams() as _];
     let mut ost_index = 0;
     for (ist_index, ist) in ictx.streams().enumerate() {
@@ -50,6 +51,12 @@ fn main() {
         }
         let ost = octx.stream(ost_index as _).unwrap();
         packet.rescale_ts(ist_time_bases[ist_index], ost.time_base());
+        if packet.dts().is_none() || packet.pts().is_none() || packet.dts().unwrap() < 0 || packet.pts().unwrap() < 0 || packet.dts().unwrap() > packet.pts().unwrap() || first_frame_mapping[ist_index] {
+            first_frame_mapping[ist_index] = false;
+            packet.set_dts(Option::Some(0));
+            packet.set_pts(Option::Some(0));
+            packet.set_duration(0);
+        }
         packet.set_position(-1);
         packet.set_stream(ost_index as _);
         packet.write_interleaved(&mut octx).unwrap();
